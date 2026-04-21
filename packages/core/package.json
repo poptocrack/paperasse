@@ -31,6 +31,10 @@
     "./config": {
       "types": "./dist/config/index.d.ts",
       "import": "./dist/config/index.js"
+    },
+    "./benchmark": {
+      "types": "./dist/benchmark/index.d.ts",
+      "import": "./dist/benchmark/index.js"
     }
   },
   "files": ["dist"],

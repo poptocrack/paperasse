@@ -26,3 +26,7 @@ coverage/
 .paperasse/
 *.sqlite
 *.sqlite-journal
+
+# Benchmark output contains transaction labels + email subjects
+benchmark.csv
+*.benchmark.csv

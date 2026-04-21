@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import process from 'node:process';
-import { confirm, input, password } from '@inquirer/prompts';
+import { checkbox, confirm, input, password } from '@inquirer/prompts';
 import { config, db, gmail, qonto } from '@paperasse/core';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -70,6 +70,34 @@ export async function initCommand(): Promise<void> {
   }
   spinner.succeed(chalk.green(`Qonto connecté : ${org.legalName}`));
 
+  if (org.bankAccounts.length === 0) {
+    console.error(chalk.red('Aucun bank account trouvé sur cette organisation Qonto.'));
+    process.exit(1);
+  }
+
+  let selectedIbans: string[];
+  if (org.bankAccounts.length === 1) {
+    const only = org.bankAccounts[0];
+    if (!only) {
+      console.error(chalk.red('Bank account introuvable.'));
+      process.exit(1);
+    }
+    selectedIbans = [only.iban];
+    console.log(
+      chalk.dim(`Un seul compte détecté (${formatBankAccount(only)}) — auto-sélectionné.`),
+    );
+  } else {
+    selectedIbans = await checkbox({
+      message: 'Quels comptes bancaires paperasse doit-il scanner ?',
+      choices: org.bankAccounts.map((a) => ({
+        name: formatBankAccount(a),
+        value: a.iban,
+        checked: true,
+      })),
+      required: true,
+    });
+  }
+
   const database = db.openDb(DB_PATH);
   try {
     database.transaction(() => {
@@ -95,11 +123,21 @@ export async function initCommand(): Promise<void> {
 
   config.writeConfig(CONFIG_PATH, {
     version: config.CONFIG_VERSION,
-    qonto: { slug: org.slug, organizationName: org.legalName },
+    qonto: {
+      slug: org.slug,
+      organizationName: org.legalName,
+      bankAccountIbans: selectedIbans,
+    },
     gmail: { clientId },
   });
 
   console.log();
   console.log(chalk.green(`✓ Setup terminé. État sauvegardé dans ${PAPERASSE_HOME}/`));
   console.log(`Prochaine étape : ${chalk.bold('paperasse sync --days 30')}`);
+}
+
+function formatBankAccount(a: qonto.QontoBankAccount): string {
+  const last4 = a.iban.slice(-4);
+  const title = a.name || a.slug || 'compte';
+  return `${title} — ${a.iban.slice(0, 4)}…${last4} (${a.currency})`;
 }

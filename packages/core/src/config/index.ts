@@ -9,6 +9,9 @@ export type Config = {
   qonto: {
     slug: string;
     organizationName: string;
+    // IBANs the user opted in to track at init time. Benchmark, sync, match
+    // all pull transactions only from these accounts.
+    bankAccountIbans: string[];
   };
   gmail: {
     // The client_id used for the OAuth flow — NOT a secret, kept for traceability.

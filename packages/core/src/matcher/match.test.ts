@@ -6,6 +6,8 @@ const tx = (overrides: Partial<QontoTransaction>): QontoTransaction => ({
   id: 't-1',
   amountCents: 4200,
   currency: 'EUR',
+  localAmountCents: 4200,
+  localCurrency: 'EUR',
   settledAt: '2026-04-15',
   label: 'CB STRIPE PAYMENTS',
   rawLabel: 'CB STRIPE PAYMENTS',

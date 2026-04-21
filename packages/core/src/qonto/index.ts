@@ -1,2 +1,12 @@
-export { verifyQontoCreds, QONTO_BASE_URL } from './client.js';
-export type { QontoCreds, QontoOrganization } from './client.js';
+export {
+  verifyQontoCreds,
+  getOrganization,
+  listTransactions,
+  QONTO_BASE_URL,
+} from './client.js';
+export type {
+  QontoBankAccount,
+  QontoCreds,
+  QontoOrganization,
+  ListTransactionsParams,
+} from './client.js';
