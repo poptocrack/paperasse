@@ -1,0 +1,17 @@
+{
+  "stripe": ["STRIPE", "STRIPE PAYMENTS", "STRIPE INC"],
+  "openai": ["OPENAI", "OPENAI LLC"],
+  "anthropic": ["ANTHROPIC", "ANTHROPIC PBC"],
+  "aws": ["AMAZON WEB SERVICES", "AMZN AWS", "AWS EMEA"],
+  "github": ["GITHUB", "GITHUB INC"],
+  "vercel": ["VERCEL", "VERCEL INC"],
+  "ovh": ["OVH", "OVHCLOUD", "OVH SAS"],
+  "scaleway": ["SCALEWAY", "SCALEWAY SAS"],
+  "notion": ["NOTION", "NOTION LABS"],
+  "linear": ["LINEAR", "LINEAR ORBIT"],
+  "figma": ["FIGMA", "FIGMA INC"],
+  "cloudflare": ["CLOUDFLARE", "CLOUDFLARE INC"],
+  "sentry": ["SENTRY", "FUNCTIONAL SOFTWARE"],
+  "slack": ["SLACK", "SLACK TECHNOLOGIES"],
+  "google-workspace": ["GOOGLE WORKSPACE", "GSUITE", "GOOGLE CLOUD EMEA"]
+}

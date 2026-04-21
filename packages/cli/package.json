@@ -1,0 +1,31 @@
+{
+  "name": "paperasse",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CLI paperasse (init, sync, match) — rapproche tes factures Gmail avec tes transactions Qonto.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "paperasse": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@paperasse/core": "workspace:*",
+    "@iarna/toml": "^2.2.5",
+    "@inquirer/prompts": "^7.2.1",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "ora": "^8.1.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "vitest": "^2.1.8"
+  }
+}
