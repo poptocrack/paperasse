@@ -2,6 +2,7 @@ export {
   verifyQontoCreds,
   getOrganization,
   listTransactions,
+  uploadAttachment,
   QONTO_BASE_URL,
 } from './client.js';
 export type {
@@ -9,4 +10,5 @@ export type {
   QontoCreds,
   QontoOrganization,
   ListTransactionsParams,
+  UploadAttachmentParams,
 } from './client.js';

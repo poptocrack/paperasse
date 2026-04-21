@@ -10,17 +10,21 @@ CREATE TABLE IF NOT EXISTS emails (
 
 CREATE TABLE IF NOT EXISTS invoices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  message_id TEXT NOT NULL REFERENCES emails(message_id),
-  attachment_hash TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  attachment_id TEXT NOT NULL,
+  attachment_filename TEXT,
   vendor TEXT NOT NULL,
+  from_domain TEXT NOT NULL,
+  subject TEXT,
   amount_cents INTEGER NOT NULL,
   currency TEXT NOT NULL DEFAULT 'EUR',
+  candidate_amounts_cents TEXT NOT NULL DEFAULT '[]',
   invoice_date TEXT NOT NULL,
-  pdf_local_path TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   qonto_transaction_id TEXT,
+  uploaded_at TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(message_id, attachment_hash)
+  UNIQUE(message_id, attachment_id)
 );
 
 CREATE TABLE IF NOT EXISTS tokens (

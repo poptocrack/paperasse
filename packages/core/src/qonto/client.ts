@@ -82,6 +82,48 @@ export async function getOrganization(creds: QontoCreds): Promise<QontoOrganizat
   };
 }
 
+export type UploadAttachmentParams = {
+  creds: QontoCreds;
+  transactionId: string;
+  filename: string;
+  pdfBytes: Buffer | Uint8Array;
+};
+
+// Uploads a PDF as a justificatif on a Qonto transaction.
+// Endpoint: POST /v2/transactions/{id}/attachments, multipart/form-data, field "file".
+export async function uploadAttachment(params: UploadAttachmentParams): Promise<void> {
+  const form = new FormData();
+  // Node's native FormData accepts Blob. Buffer → Blob via Uint8Array view.
+  const ab = toArrayBuffer(params.pdfBytes);
+  const blob = new Blob([ab], { type: 'application/pdf' });
+  form.append('file', blob, params.filename);
+
+  const res = await fetch(
+    `${QONTO_BASE_URL}/transactions/${encodeURIComponent(params.transactionId)}/attachments`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `${params.creds.slug}:${params.creds.secretKey}`,
+        Accept: 'application/json',
+      },
+      body: form,
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(
+      `Qonto upload ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ''}`,
+    );
+  }
+}
+
+function toArrayBuffer(data: Buffer | Uint8Array): ArrayBuffer {
+  const view = data instanceof Buffer ? new Uint8Array(data) : data;
+  const ab = new ArrayBuffer(view.byteLength);
+  new Uint8Array(ab).set(view);
+  return ab;
+}
+
 export type ListTransactionsParams = {
   creds: QontoCreds;
   iban: string;
@@ -117,6 +159,7 @@ export async function listTransactions(
 
     type Raw = {
       transactions?: {
+        id?: string;
         transaction_id?: string;
         amount_cents?: number;
         currency?: string;
@@ -138,13 +181,17 @@ export async function listTransactions(
     const toDate = params.settledAtTo.slice(0, 10);
     let allOlderThanWindow = rows.length > 0;
     for (const t of rows) {
-      if (!t.transaction_id || typeof t.amount_cents !== 'number' || !t.settled_at) continue;
+      // Qonto returns two IDs per transaction: `id` is the bare UUID (what all
+      // v2 endpoints expect in paths like /transactions/{id}/attachments), and
+      // `transaction_id` is a composite legacy string. We need the UUID.
+      const txUuid = t.id;
+      if (!txUuid || typeof t.amount_cents !== 'number' || !t.settled_at) continue;
       if (t.side && t.side !== 'debit') continue;
       const day = t.settled_at.slice(0, 10);
       if (day >= fromDate) allOlderThanWindow = false;
       if (day < fromDate || day > toDate) continue;
       out.push({
-        id: t.transaction_id,
+        id: txUuid,
         amountCents: t.amount_cents,
         currency: t.currency ?? 'EUR',
         localAmountCents: t.local_amount_cents ?? t.amount_cents,

@@ -3,14 +3,22 @@ export type InvoiceStatus = 'pending' | 'matched' | 'uploaded' | 'skipped' | 'er
 export type Invoice = {
   id: number;
   messageId: string;
-  attachmentHash: string;
+  // Gmail attachment ID — used to re-fetch the PDF at upload time so we never
+  // persist the bytes locally.
+  attachmentId: string;
+  attachmentFilename: string | null;
   vendor: string;
+  fromDomain: string;
+  subject: string | null;
   amountCents: number;
   currency: string;
+  // All candidate amounts extracted from body/PDF — the matcher tries each
+  // against Qonto transactions.
+  candidateAmountsCents: number[];
   invoiceDate: string;
-  pdfLocalPath: string;
   status: InvoiceStatus;
   qontoTransactionId: string | null;
+  uploadedAt: string | null;
   createdAt: string;
 };
 

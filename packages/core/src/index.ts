@@ -5,3 +5,4 @@ export * as gmail from './gmail/index.js';
 export * as qonto from './qonto/index.js';
 export * as config from './config/index.js';
 export * as benchmark from './benchmark/index.js';
+export * as vendors from './vendors/index.js';
