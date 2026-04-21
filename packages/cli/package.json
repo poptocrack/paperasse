@@ -10,7 +10,7 @@
   },
   "files": ["dist"],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "pnpm --filter @paperasse/core build && tsx src/index.ts",
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"

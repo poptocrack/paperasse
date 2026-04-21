@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { matchCommand } from './commands/match.js';
 import { syncCommand } from './commands/sync.js';
+import { loadDevEnv } from './env.js';
+
+loadDevEnv();
 
 const program = new Command();
 
