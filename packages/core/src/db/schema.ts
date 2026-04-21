@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS emails (
 
 CREATE TABLE IF NOT EXISTS invoices (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL DEFAULT 'gmail',
   message_id TEXT NOT NULL,
   attachment_id TEXT NOT NULL,
   attachment_filename TEXT,

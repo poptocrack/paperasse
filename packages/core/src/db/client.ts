@@ -15,17 +15,22 @@ export function openDb(path: string): Db {
   return db;
 }
 
-// Pre-V1 migration: if the invoices table exists but predates the attachment_id
-// column, drop it. Safe to do pre-release because no real uploads have happened
-// yet — any rows are from local testing and can be re-synced. Once we ship to
-// real users we'll replace this with pragma user_version + proper ALTER migrations.
+// Pre-V1 migrations. Once we ship to real users we'll replace these ad-hoc
+// checks with pragma user_version + proper ALTER scripts — for now any rows
+// are from local testing and can be re-synced safely.
 function migrateInvoicesTable(db: Db): void {
   const cols = db.prepare('PRAGMA table_info(invoices)').all() as { name: string }[];
   if (cols.length === 0) return;
   const hasAttachmentId = cols.some((c) => c.name === 'attachment_id');
-  if (hasAttachmentId) return;
-  db.exec('DROP TABLE IF EXISTS invoices');
-  db.exec(SCHEMA_SQL);
+  if (!hasAttachmentId) {
+    db.exec('DROP TABLE IF EXISTS invoices');
+    db.exec(SCHEMA_SQL);
+    return;
+  }
+  const hasSource = cols.some((c) => c.name === 'source');
+  if (!hasSource) {
+    db.exec("ALTER TABLE invoices ADD COLUMN source TEXT NOT NULL DEFAULT 'gmail'");
+  }
 }
 
 export type StoredToken = {
@@ -71,6 +76,7 @@ export function getToken(db: Db, provider: string): StoredToken | null {
 
 type InvoiceRow = {
   id: number;
+  source: 'gmail' | 'inbox';
   message_id: string;
   attachment_id: string;
   attachment_filename: string | null;
@@ -95,14 +101,15 @@ export function upsertInvoice(db: Db, inv: NewInvoice): boolean {
   const res = db
     .prepare(
       `INSERT INTO invoices (
-        message_id, attachment_id, attachment_filename, vendor, from_domain,
+        source, message_id, attachment_id, attachment_filename, vendor, from_domain,
         subject, amount_cents, currency, candidate_amounts_cents, invoice_date,
         status, qonto_transaction_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(message_id, attachment_id) DO NOTHING`,
     )
     .run(
+      inv.source,
       inv.messageId,
       inv.attachmentId,
       inv.attachmentFilename,
@@ -124,7 +131,7 @@ export function listInvoicesByStatus(db: Db, status: InvoiceStatus | InvoiceStat
   const placeholders = statuses.map(() => '?').join(',');
   const rows = db
     .prepare(
-      `SELECT id, message_id, attachment_id, attachment_filename, vendor, from_domain,
+      `SELECT id, source, message_id, attachment_id, attachment_filename, vendor, from_domain,
               subject, amount_cents, currency, candidate_amounts_cents, invoice_date,
               status, qonto_transaction_id, uploaded_at, created_at
        FROM invoices
@@ -154,6 +161,7 @@ export function markInvoiceError(db: Db, invoiceId: number): void {
 function hydrateInvoice(row: InvoiceRow): Invoice {
   return {
     id: row.id,
+    source: row.source,
     messageId: row.message_id,
     attachmentId: row.attachment_id,
     attachmentFilename: row.attachment_filename,

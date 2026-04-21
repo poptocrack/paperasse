@@ -1,18 +1,22 @@
+import { spawn } from 'node:child_process';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
-import { confirm, select } from '@inquirer/prompts';
+import { select } from '@inquirer/prompts';
 import { config, db, gmail, qonto, vendors } from '@paperasse/core';
 import type { Invoice, QontoTransaction } from '@paperasse/core';
 import chalk from 'chalk';
 import ora from 'ora';
-import { CONFIG_PATH, DB_PATH } from '../paths.js';
+import { ingestInbox } from '../inbox.js';
+import { CONFIG_PATH, DB_PATH, INBOX_DIR } from '../paths.js';
 
 export type MatchOptions = {
   dry: boolean;
 };
 
-// V1 runtime window (the benchmark ceiling is wider). Invoices typically
-// email 0-3 days before the card settles; EUR-denominated direct debits can
-// appear same-day.
+// V1 runtime window for Gmail-sourced invoices. Inbox invoices bypass this —
+// the user may have dropped the PDF days/weeks after the transaction settled.
 const DAYS_BEFORE = 2;
 const DAYS_AFTER = 5;
 
@@ -53,8 +57,14 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
     secretKey: qontoToken.accessToken,
   };
 
-  // Pull Qonto transactions for selected accounts over a window that covers
-  // the freshest invoices in DB (60 days back is plenty for a weekly cadence).
+  // Ingest anything the user (or an agent/script) dropped into the inbox
+  // since the last run. Safe no-op if the dir doesn't exist yet.
+  await mkdir(INBOX_DIR, { recursive: true });
+  const ingested = await ingestInbox(database, INBOX_DIR);
+  if (ingested.added > 0) {
+    console.log(chalk.dim(`Inbox : +${ingested.added} PDF(s) ingérés depuis ${INBOX_DIR}`));
+  }
+
   const now = new Date();
   const windowStart = new Date(now);
   windowStart.setUTCDate(windowStart.getUTCDate() - 60);
@@ -135,7 +145,7 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
       continue;
     }
 
-    const picked = await pickInvoice(tx, candidates);
+    const picked = await pickInvoiceWithPreview(tx, candidates, session.gmail);
     if (picked === 'skip') {
       skipped += 1;
       continue;
@@ -155,13 +165,9 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
       continue;
     }
 
-    const uploadSpinner = ora('  Fetch PDF depuis Gmail + upload Qonto…').start();
+    const uploadSpinner = ora('  Upload vers Qonto…').start();
     try {
-      const bytes = await gmail.getAttachmentBytes(
-        session.gmail,
-        picked.messageId,
-        picked.attachmentId,
-      );
+      const bytes = await loadInvoiceBytes(picked, session.gmail);
       await qonto.uploadAttachment({
         creds: qontoCreds,
         transactionId: tx.id,
@@ -169,6 +175,10 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
         pdfBytes: bytes,
       });
       db.markInvoiceUploaded(database, picked.id, tx.id);
+      if (picked.source === 'inbox') {
+        // File served its purpose — remove it so the user's inbox stays clean.
+        await unlink(join(INBOX_DIR, picked.attachmentId)).catch(() => {});
+      }
       uploaded += 1;
       uploadSpinner.succeed(chalk.green('  ✓ uploadé.'));
     } catch (err) {
@@ -184,6 +194,14 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
   console.log(`  ${chalk.green(`✓ ${uploaded} uploadé(s)`)}`);
   console.log(`  ${chalk.yellow(`⤵ ${skipped} skippé(s)`)}`);
   console.log(`  ${chalk.red(`✗ ${noMatch} sans email candidat (voir liens ci-dessus)`)}`);
+  if (noMatch > 0) {
+    console.log();
+    console.log(
+      chalk.dim(
+        `Pour les ${noMatch} tx sans email : télécharge les PDFs depuis les liens, dépose-les dans ${INBOX_DIR}/, puis relance \`paperasse match\`.`,
+      ),
+    );
+  }
 }
 
 function findCandidateInvoices(tx: QontoTransaction, invoices: Invoice[]): Invoice[] {
@@ -191,7 +209,13 @@ function findCandidateInvoices(tx: QontoTransaction, invoices: Invoice[]): Invoi
   const windowEnd = shiftDate(tx.settledAt, DAYS_AFTER);
   return invoices
     .filter((inv) => inv.status === 'pending' || inv.status === 'matched' || inv.status === 'error')
-    .filter((inv) => inv.invoiceDate >= windowStart && inv.invoiceDate <= windowEnd)
+    .filter((inv) => {
+      // Inbox invoices bypass the date window — the user may have downloaded
+      // the PDF days after the transaction. Gmail invoices enforce the window
+      // to avoid false positives from unrelated receipts.
+      if (inv.source === 'inbox') return true;
+      return inv.invoiceDate >= windowStart && inv.invoiceDate <= windowEnd;
+    })
     .filter(
       (inv) =>
         inv.candidateAmountsCents.includes(tx.amountCents) ||
@@ -199,43 +223,78 @@ function findCandidateInvoices(tx: QontoTransaction, invoices: Invoice[]): Invoi
     );
 }
 
-async function pickInvoice(
+async function pickInvoiceWithPreview(
   tx: QontoTransaction,
   candidates: Invoice[],
+  gmailApi: gmail.GmailSession['gmail'],
 ): Promise<Invoice | 'skip' | 'none'> {
-  if (candidates.length === 1) {
-    const only = candidates[0];
-    if (!only) return 'skip';
-    console.log(`  ${chalk.dim('→')} ${formatInvoice(only, tx)}`);
-    const ok = await confirm({
-      message: '  Upload ce PDF comme justificatif ?',
-      default: true,
+  // Loop lets the user preview one or more candidates before committing.
+  while (true) {
+    const choice = await select<Invoice | 'preview' | 'skip' | 'none'>({
+      message: `  ${candidates.length} facture(s) candidate(s) :`,
+      choices: [
+        ...candidates.map((inv) => ({
+          name: formatInvoice(inv, tx),
+          value: inv,
+        })),
+        { name: chalk.dim('— preview (ouvrir le PDF dans Aperçu)'), value: 'preview' as const },
+        { name: chalk.dim('— skip (revoir plus tard)'), value: 'skip' as const },
+        { name: chalk.dim('— aucune ne colle'), value: 'none' as const },
+      ],
     });
-    if (!ok) {
-      const reason = await select({
-        message: '  Pourquoi ?',
-        choices: [
-          { name: 'skip — cette tx, revoir plus tard', value: 'skip' as const },
-          { name: 'none — aucune de ces factures ne colle', value: 'none' as const },
-        ],
-      });
-      return reason;
-    }
-    return only;
-  }
 
-  const choice = await select<Invoice | 'skip' | 'none'>({
-    message: `  ${candidates.length} factures candidates :`,
-    choices: [
-      ...candidates.map((inv) => ({
-        name: formatInvoice(inv, tx),
-        value: inv,
-      })),
-      { name: chalk.dim('— skip (revoir plus tard)'), value: 'skip' as const },
-      { name: chalk.dim('— aucune ne colle'), value: 'none' as const },
-    ],
-  });
-  return choice;
+    if (choice !== 'preview') return choice;
+
+    if (candidates.length === 1) {
+      const only = candidates[0];
+      if (only) await previewInvoice(only, gmailApi);
+      continue;
+    }
+    const toPreview = await select<Invoice | 'back'>({
+      message: '  Laquelle ouvrir ?',
+      choices: [
+        ...candidates.map((inv) => ({ name: formatInvoice(inv, tx), value: inv })),
+        { name: chalk.dim('— retour'), value: 'back' as const },
+      ],
+    });
+    if (toPreview !== 'back') await previewInvoice(toPreview, gmailApi);
+  }
+}
+
+async function previewInvoice(inv: Invoice, gmailApi: gmail.GmailSession['gmail']): Promise<void> {
+  const spinner = ora('  Préparation du preview…').start();
+  try {
+    if (inv.source === 'inbox') {
+      spinner.stop();
+      openWithDefault(join(INBOX_DIR, inv.attachmentId));
+      return;
+    }
+    const bytes = await gmail.getAttachmentBytes(gmailApi, inv.messageId, inv.attachmentId);
+    const tmpPath = join(tmpdir(), `paperasse-preview-${Date.now()}-${inv.id}.pdf`);
+    await writeFile(tmpPath, bytes);
+    spinner.stop();
+    openWithDefault(tmpPath);
+    // Give the viewer time to load the file before we clean up.
+    setTimeout(() => unlink(tmpPath).catch(() => {}), 60_000);
+  } catch (err) {
+    spinner.fail(chalk.red(`  Preview impossible : ${(err as Error).message}`));
+  }
+}
+
+function openWithDefault(path: string): void {
+  const cmd =
+    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  spawn(cmd, [path], { detached: true, stdio: 'ignore' }).unref();
+}
+
+async function loadInvoiceBytes(
+  inv: Invoice,
+  gmailApi: gmail.GmailSession['gmail'],
+): Promise<Buffer> {
+  if (inv.source === 'inbox') {
+    return readFile(join(INBOX_DIR, inv.attachmentId));
+  }
+  return gmail.getAttachmentBytes(gmailApi, inv.messageId, inv.attachmentId);
 }
 
 function printNoMatchHint(tx: QontoTransaction): void {
@@ -250,14 +309,14 @@ function printNoMatchHint(tx: QontoTransaction): void {
     if (hint.pdfAvailability === 'email-pdf') {
       console.log(
         chalk.dim(
-          "  (Ce vendor attache normalement le PDF — vérifie que l'email n'est pas passé en spam ou dans un autre compte.)",
+          "  (Ce vendor attache normalement le PDF — vérifie que l'email n'est pas passé en spam.)",
         ),
       );
     }
   } else {
     console.log(
       chalk.dim(
-        `  Télécharge la facture depuis le portail du fournisseur (${tx.label || 'label Qonto inconnu'}) puis upload manuellement sur Qonto.`,
+        `  Télécharge la facture depuis le portail du fournisseur puis dépose-la dans ${INBOX_DIR}/.`,
       ),
     );
   }
@@ -274,15 +333,14 @@ function formatTx(tx: QontoTransaction): string {
 }
 
 function formatInvoice(inv: Invoice, tx: QontoTransaction): string {
-  // The amount that actually caused the match — either tx.amountCents (EUR
-  // settlement) or tx.localAmountCents (original USD charge for FX cards).
   const matchedCents = inv.candidateAmountsCents.includes(tx.amountCents)
     ? tx.amountCents
     : tx.localAmountCents;
   const matchedCurrency = matchedCents === tx.amountCents ? tx.currency : tx.localCurrency;
   const extraCount = inv.candidateAmountsCents.filter((c) => c !== matchedCents).length;
-  const extras = extraCount > 0 ? chalk.dim(` (+${extraCount} autres montants dans le PDF)`) : '';
-  return `${inv.vendor} — ${inv.invoiceDate} — ${inv.attachmentFilename ?? 'invoice.pdf'} — match ${chalk.green(formatAmount(matchedCents, matchedCurrency))}${extras}`;
+  const extras = extraCount > 0 ? chalk.dim(` (+${extraCount} autres montants)`) : '';
+  const tag = inv.source === 'inbox' ? chalk.cyan('[inbox] ') : '';
+  return `${tag}${inv.vendor} — ${inv.invoiceDate} — ${inv.attachmentFilename ?? 'invoice.pdf'} — match ${chalk.green(formatAmount(matchedCents, matchedCurrency))}${extras}`;
 }
 
 function formatAmount(cents: number, currency: string): string {

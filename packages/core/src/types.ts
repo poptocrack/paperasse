@@ -1,10 +1,15 @@
 export type InvoiceStatus = 'pending' | 'matched' | 'uploaded' | 'skipped' | 'error';
 
+// Where the PDF bytes live. 'gmail' = re-fetch from Gmail API at upload time.
+// 'inbox' = read from ~/.paperasse/inbox/ (user-dropped file).
+export type InvoiceSource = 'gmail' | 'inbox';
+
 export type Invoice = {
   id: number;
+  source: InvoiceSource;
   messageId: string;
-  // Gmail attachment ID — used to re-fetch the PDF at upload time so we never
-  // persist the bytes locally.
+  // For Gmail: Gmail's attachment ID. For inbox: the file basename inside
+  // ~/.paperasse/inbox/. Either way it's how we locate the bytes.
   attachmentId: string;
   attachmentFilename: string | null;
   vendor: string;

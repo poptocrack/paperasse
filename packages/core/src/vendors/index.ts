@@ -109,14 +109,15 @@ export const VENDOR_REGISTRY: VendorHint[] = [
     billingUrl: 'https://app.netlify.com/teams/',
     pdfAvailability: 'portal-login',
     matches: [/netlify/i],
-    note: "Netlify n'attache pas le PDF aux emails. Ouvre la page Billing, section Invoices.",
+    note: "Netlify n'attache pas le PDF. Ouvre ta team → Billing → General, section Invoices. URL directe : app.netlify.com/teams/TA-TEAM/billing/general#invoices",
   },
   {
     key: 'vercel',
     name: 'Vercel',
-    billingUrl: 'https://vercel.com/dashboard/settings/invoices',
+    billingUrl: 'https://vercel.com/dashboard',
     pdfAvailability: 'portal-login',
     matches: [/vercel/i],
+    note: 'Settings → Billing → Invoices (URL dépend du scope team/personal).',
   },
   {
     key: 'aws',
@@ -180,6 +181,7 @@ export const VENDOR_REGISTRY: VendorHint[] = [
     billingUrl: 'https://expo.dev/accounts',
     pdfAvailability: 'portal-login',
     matches: [/\bexpo\b/i],
+    note: 'Sélectionne ton account → Billing. URL : expo.dev/accounts/TON-ACCOUNT/settings/billing',
   },
   {
     key: 'indy',

@@ -151,6 +151,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       const vendor = resolveVendorKey(parsed.fromDomain, parsed.subject);
 
       const inserted = db.upsertInvoice(database, {
+        source: 'gmail',
         messageId: parsed.id,
         attachmentId: pdfAttachment.attachmentId,
         attachmentFilename: pdfAttachment.filename,
