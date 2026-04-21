@@ -28,14 +28,45 @@ function authHeaders(creds: QontoCreds): Record<string, string> {
   };
 }
 
+// Retries a fetch on transient Qonto failures (429 rate limit, 5xx server
+// errors, network blips). Exponential backoff: 1s, 2s, 4s. Returns the final
+// Response even when it's still an error — the caller decides how to read it.
+async function fetchWithRetry(
+  url: string | URL,
+  init: Parameters<typeof fetch>[1],
+  maxAttempts = 3,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if ((res.status === 429 || res.status >= 500) && attempt < maxAttempts) {
+        await sleep(1000 * 2 ** (attempt - 1));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastError = err;
+      if (attempt === maxAttempts) throw err;
+      await sleep(1000 * 2 ** (attempt - 1));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Qonto fetch failed');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function verifyQontoCreds(creds: QontoCreds): Promise<QontoOrganization> {
   return getOrganization(creds);
 }
 
 export async function getOrganization(creds: QontoCreds): Promise<QontoOrganization> {
-  const res = await fetch(`${QONTO_BASE_URL}/organizations/${encodeURIComponent(creds.slug)}`, {
-    headers: authHeaders(creds),
-  });
+  const res = await fetchWithRetry(
+    `${QONTO_BASE_URL}/organizations/${encodeURIComponent(creds.slug)}`,
+    { headers: authHeaders(creds) },
+  );
   if (res.status === 401 || res.status === 403) {
     throw new Error(
       `Qonto a renvoyé ${res.status}. Vérifie ton slug et ta secret key dans Paramètres > Intégrations et API.`,
@@ -98,7 +129,7 @@ export async function uploadAttachment(params: UploadAttachmentParams): Promise<
   const blob = new Blob([ab], { type: 'application/pdf' });
   form.append('file', blob, params.filename);
 
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${QONTO_BASE_URL}/transactions/${encodeURIComponent(params.transactionId)}/attachments`,
     {
       method: 'POST',
@@ -152,7 +183,7 @@ export async function listTransactions(
     // inconsistent across doc versions (settled_at_from/emitted_at_from) and
     // get silently ignored when wrong. We filter client-side instead.
 
-    const res = await fetch(url, { headers: authHeaders(params.creds) });
+    const res = await fetchWithRetry(url, { headers: authHeaders(params.creds) });
     if (!res.ok) {
       throw new Error(`Qonto /transactions a renvoyé ${res.status} ${res.statusText}.`);
     }

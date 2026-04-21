@@ -3,6 +3,7 @@ import { accountsCommand } from './commands/accounts.js';
 import { benchmarkCommand } from './commands/benchmark.js';
 import { initCommand } from './commands/init.js';
 import { matchCommand } from './commands/match.js';
+import { statusCommand } from './commands/status.js';
 import { syncCommand } from './commands/sync.js';
 import { loadDevEnv } from './env.js';
 
@@ -27,6 +28,13 @@ program
   .description('Change les comptes bancaires Qonto que paperasse scanne.')
   .action(async () => {
     await accountsCommand();
+  });
+
+program
+  .command('status')
+  .description('État actuel : factures en base, tx Qonto sans justif, inbox, historique.')
+  .action(async () => {
+    await statusCommand();
   });
 
 program

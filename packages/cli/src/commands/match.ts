@@ -106,7 +106,16 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
   }
 
   const invoices = db.listInvoicesByStatus(database, ['pending', 'matched', 'error']);
-  console.log(chalk.dim(`${invoices.length} facture(s) en base dispo pour le match.\n`));
+  const errorCount = invoices.filter((i) => i.status === 'error').length;
+  console.log(chalk.dim(`${invoices.length} facture(s) en base dispo pour le match.`));
+  if (errorCount > 0) {
+    console.log(
+      chalk.yellow(
+        `⚠ ${errorCount} facture(s) en erreur au dernier run — elles seront re-proposées.`,
+      ),
+    );
+  }
+  console.log();
 
   const session = gmail.createGmailSession(
     { clientId, clientSecret },
@@ -175,6 +184,13 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
         pdfBytes: bytes,
       });
       db.markInvoiceUploaded(database, picked.id, tx.id);
+      db.logEvent(database, {
+        type: 'upload',
+        invoiceId: picked.id,
+        qontoTransactionId: tx.id,
+        amountCents: tx.amountCents,
+        metadata: { source: picked.source, vendor: picked.vendor },
+      });
       if (picked.source === 'inbox') {
         // File served its purpose — remove it so the user's inbox stays clean.
         await unlink(join(INBOX_DIR, picked.attachmentId)).catch(() => {});

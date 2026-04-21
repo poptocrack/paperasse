@@ -158,6 +158,83 @@ export function markInvoiceError(db: Db, invoiceId: number): void {
   db.prepare("UPDATE invoices SET status = 'error' WHERE id = ?").run(invoiceId);
 }
 
+export type EventType = 'upload' | 'sync' | 'match_run';
+
+export type LogEventParams = {
+  type: EventType;
+  invoiceId?: number | null;
+  qontoTransactionId?: string | null;
+  amountCents?: number | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export function logEvent(db: Db, e: LogEventParams): void {
+  db.prepare(
+    `INSERT INTO events (type, invoice_id, qonto_transaction_id, amount_cents, metadata)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(
+    e.type,
+    e.invoiceId ?? null,
+    e.qontoTransactionId ?? null,
+    e.amountCents ?? null,
+    e.metadata ? JSON.stringify(e.metadata) : null,
+  );
+}
+
+export type EventStats = {
+  uploadsTotal: number;
+  uploadsLast30d: number;
+  amountMatchedCentsTotal: number;
+  amountMatchedCentsLast30d: number;
+};
+
+export function getEventStats(db: Db): EventStats {
+  const totals = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(amount_cents), 0) AS sum_cents
+       FROM events WHERE type = 'upload'`,
+    )
+    .get() as { n: number; sum_cents: number };
+  const last30 = db
+    .prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(amount_cents), 0) AS sum_cents
+       FROM events
+       WHERE type = 'upload' AND created_at > datetime('now', '-30 days')`,
+    )
+    .get() as { n: number; sum_cents: number };
+  return {
+    uploadsTotal: totals.n,
+    uploadsLast30d: last30.n,
+    amountMatchedCentsTotal: totals.sum_cents,
+    amountMatchedCentsLast30d: last30.sum_cents,
+  };
+}
+
+export type InvoiceCounts = Record<InvoiceStatus, number>;
+
+export function countInvoicesByStatus(db: Db): InvoiceCounts {
+  const rows = db.prepare('SELECT status, COUNT(*) AS n FROM invoices GROUP BY status').all() as {
+    status: InvoiceStatus;
+    n: number;
+  }[];
+  const out: InvoiceCounts = {
+    pending: 0,
+    matched: 0,
+    uploaded: 0,
+    skipped: 0,
+    error: 0,
+  };
+  for (const r of rows) out[r.status] = r.n;
+  return out;
+}
+
+export function getLastEventAt(db: Db, type: EventType): string | null {
+  const row = db.prepare('SELECT MAX(created_at) AS at FROM events WHERE type = ?').get(type) as
+    | { at: string | null }
+    | undefined;
+  return row?.at ?? null;
+}
+
 function hydrateInvoice(row: InvoiceRow): Invoice {
   return {
     id: row.id,

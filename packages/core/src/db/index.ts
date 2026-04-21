@@ -8,5 +8,17 @@ export {
   markInvoiceUploaded,
   markInvoiceSkipped,
   markInvoiceError,
+  logEvent,
+  getEventStats,
+  countInvoicesByStatus,
+  getLastEventAt,
 } from './client.js';
-export type { Db, StoredToken, NewInvoice } from './client.js';
+export type {
+  Db,
+  StoredToken,
+  NewInvoice,
+  EventType,
+  LogEventParams,
+  EventStats,
+  InvoiceCounts,
+} from './client.js';
