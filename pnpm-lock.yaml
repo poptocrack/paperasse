@@ -29,9 +29,9 @@ importers:
       '@inquirer/prompts':
         specifier: ^7.2.1
         version: 7.10.1(@types/node@22.19.17)
-      '@paperasse/core':
-        specifier: workspace:*
-        version: link:../core
+      better-sqlite3:
+        specifier: ^12.9.0
+        version: 12.9.0
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -41,6 +41,12 @@ importers:
       commander:
         specifier: ^12.1.0
         version: 12.1.0
+      googleapis:
+        specifier: ^171.4.0
+        version: 171.4.0
+      open:
+        specifier: ^11.0.0
+        version: 11.0.0
       ora:
         specifier: ^8.1.1
         version: 8.2.0
@@ -48,9 +54,18 @@ importers:
         specifier: ^2.4.5
         version: 2.4.5
     devDependencies:
+      '@paperasse/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/pdf-parse':
         specifier: ^1.1.5
         version: 1.1.5
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       tsup:
         specifier: ^8.3.5
         version: 8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@5.9.3)
@@ -985,6 +1000,10 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
+    engines: {node: '>=12'}
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -2286,6 +2305,8 @@ snapshots:
   define-lazy-prop@3.0.0: {}
 
   detect-libc@2.1.2: {}
+
+  dotenv@17.4.2: {}
 
   dunder-proto@1.0.1:
     dependencies:

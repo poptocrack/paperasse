@@ -1,32 +1,62 @@
 {
   "name": "paperasse",
-  "version": "0.0.0",
-  "private": true,
-  "description": "CLI paperasse (init, sync, match) — rapproche tes factures Gmail avec tes transactions Qonto.",
+  "version": "0.0.1",
+  "description": "CLI open-source qui rapproche tes factures Gmail avec tes transactions Qonto. Pour devs freelances FR.",
   "license": "MIT",
+  "author": "Tristan Debroise",
   "type": "module",
   "bin": {
     "paperasse": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md"],
+  "homepage": "https://github.com/poptocrack/paperasse#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/poptocrack/paperasse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/poptocrack/paperasse/issues"
+  },
+  "keywords": [
+    "qonto",
+    "gmail",
+    "invoice",
+    "facture",
+    "reconciliation",
+    "accounting",
+    "freelance",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "pnpm --filter @paperasse/core build && tsx src/index.ts",
     "build": "tsup",
+    "prepublishOnly": "cp ../../README.md ./README.md && pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "@inquirer/prompts": "^7.2.1",
-    "@paperasse/core": "workspace:*",
+    "better-sqlite3": "^12.9.0",
     "chalk": "^5.3.0",
     "cli-table3": "^0.6.5",
     "commander": "^12.1.0",
+    "googleapis": "^171.4.0",
+    "open": "^11.0.0",
     "ora": "^8.1.1",
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
+    "@paperasse/core": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/pdf-parse": "^1.1.5",
+    "dotenv": "^17.4.2",
     "tsup": "^8.3.5",
     "vitest": "^2.1.8"
   }

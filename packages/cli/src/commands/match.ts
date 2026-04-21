@@ -8,6 +8,7 @@ import { config, db, gmail, qonto, vendors } from '@paperasse/core';
 import type { Invoice, QontoTransaction } from '@paperasse/core';
 import chalk from 'chalk';
 import ora from 'ora';
+import { getGoogleCreds } from '../env.js';
 import { ingestInbox } from '../inbox.js';
 import { CONFIG_PATH, DB_PATH, INBOX_DIR } from '../paths.js';
 
@@ -24,12 +25,9 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
   console.log(chalk.bold(`paperasse match${options.dry ? ' --dry' : ''}`));
   console.log();
 
-  const clientId = process.env.PAPERASSE_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.PAPERASSE_GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = getGoogleCreds();
   if (!clientId || !clientSecret) {
-    console.error(
-      chalk.red('Credentials Google OAuth manquants (PAPERASSE_GOOGLE_CLIENT_ID/_SECRET).'),
-    );
+    console.error(chalk.red('Credentials Google OAuth manquants.'));
     process.exit(1);
   }
 

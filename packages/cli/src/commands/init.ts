@@ -4,18 +4,18 @@ import { checkbox, confirm, input, password } from '@inquirer/prompts';
 import { config, db, gmail, qonto } from '@paperasse/core';
 import chalk from 'chalk';
 import ora from 'ora';
+import { getGoogleCreds } from '../env.js';
 import { CONFIG_PATH, DB_PATH, PAPERASSE_HOME } from '../paths.js';
 
 export async function initCommand(): Promise<void> {
   console.log(chalk.bold('paperasse init'));
   console.log();
 
-  const clientId = process.env.PAPERASSE_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.PAPERASSE_GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = getGoogleCreds();
   if (!clientId || !clientSecret) {
     console.error(
       chalk.red(
-        'Credentials Google OAuth manquants. Définis PAPERASSE_GOOGLE_CLIENT_ID et PAPERASSE_GOOGLE_CLIENT_SECRET avant de relancer init.',
+        'Credentials Google OAuth manquants. Ouvre une issue GitHub avec ton email pour être whitelisté en mode Testing.',
       ),
     );
     process.exit(1);

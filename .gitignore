@@ -30,3 +30,6 @@ coverage/
 # Benchmark output contains transaction labels + email subjects
 benchmark.csv
 *.benchmark.csv
+
+# README.md is copied from root into packages/cli/ at publish time only.
+packages/cli/README.md

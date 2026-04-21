@@ -3,6 +3,7 @@ import { benchmark, config, db, gmail, vendors } from '@paperasse/core';
 import chalk from 'chalk';
 import ora from 'ora';
 import { PDFParse } from 'pdf-parse';
+import { getGoogleCreds } from '../env.js';
 import { CONFIG_PATH, DB_PATH } from '../paths.js';
 
 export type SyncOptions = {
@@ -33,12 +34,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   console.log(chalk.bold(`paperasse sync --days ${options.days}`));
   console.log();
 
-  const clientId = process.env.PAPERASSE_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.PAPERASSE_GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = getGoogleCreds();
   if (!clientId || !clientSecret) {
-    console.error(
-      chalk.red('Credentials Google OAuth manquants (PAPERASSE_GOOGLE_CLIENT_ID/_SECRET).'),
-    );
+    console.error(chalk.red('Credentials Google OAuth manquants.'));
     process.exit(1);
   }
 
