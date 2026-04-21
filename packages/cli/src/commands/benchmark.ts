@@ -109,10 +109,10 @@ export async function benchmarkCommand(options: BenchmarkOptions): Promise<void>
     process.exit(1);
   }
   const excluded = allTransactions.filter(
-    (t) => t.attachmentIds.length === 0 && shouldExcludeFromBenchmark(t),
+    (t) => t.attachmentIds.length === 0 && qonto.isExcludedFromMatch(t),
   );
   const unattached = allTransactions.filter(
-    (t) => t.attachmentIds.length === 0 && !shouldExcludeFromBenchmark(t),
+    (t) => t.attachmentIds.length === 0 && !qonto.isExcludedFromMatch(t),
   );
   txSpinner.succeed(
     `Qonto : ${allTransactions.length} debit total, ${chalk.bold(unattached.length)} à justifier (${excluded.length} exclus : virements internes, URSSAF, frais Qonto)`,
@@ -307,18 +307,4 @@ function shiftDate(iso: string, days: number): string {
   const d = new Date(iso);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-// Some debits never have an email invoice and shouldn't count against the
-// match rate: Qonto's own fees, internal transfers to the founder's personal
-// account, URSSAF direct debits (notifs live on net-entreprises, not email).
-function shouldExcludeFromBenchmark(
-  t: Awaited<ReturnType<typeof qonto.listTransactions>>[number],
-): boolean {
-  if (t.operationType === 'qonto_fee') return true;
-  const label = `${t.label} ${t.rawLabel}`.toUpperCase();
-  if (t.operationType === 'transfer' && /\b(VIR(EMENT)? INTERNE|DEBROISE)\b/.test(label))
-    return true;
-  if (/\bURSSAF\b/.test(label)) return true;
-  return false;
 }

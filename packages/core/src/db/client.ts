@@ -31,6 +31,25 @@ function migrateInvoicesTable(db: Db): void {
   if (!hasSource) {
     db.exec("ALTER TABLE invoices ADD COLUMN source TEXT NOT NULL DEFAULT 'gmail'");
   }
+  backfillUploadEvents(db);
+}
+
+// The events table was added after some uploads had already shipped. Retroactively
+// insert a synthetic 'upload' event for every invoice.status='uploaded' that
+// doesn't have one yet, so the `paperasse status` history counter reflects the
+// founder's real usage instead of saying "aucun upload encore".
+function backfillUploadEvents(db: Db): void {
+  const eventsTableExists = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='events'")
+    .get();
+  if (!eventsTableExists) return;
+  db.exec(`
+    INSERT INTO events (type, invoice_id, qonto_transaction_id, amount_cents, created_at)
+    SELECT 'upload', id, qonto_transaction_id, amount_cents, COALESCE(uploaded_at, created_at)
+    FROM invoices
+    WHERE status = 'uploaded'
+      AND id NOT IN (SELECT invoice_id FROM events WHERE type = 'upload' AND invoice_id IS NOT NULL)
+  `);
 }
 
 export type StoredToken = {

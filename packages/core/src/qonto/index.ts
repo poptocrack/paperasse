@@ -5,6 +5,7 @@ export {
   uploadAttachment,
   QONTO_BASE_URL,
 } from './client.js';
+export { isExcludedFromMatch } from './filter.js';
 export type {
   QontoBankAccount,
   QontoCreds,

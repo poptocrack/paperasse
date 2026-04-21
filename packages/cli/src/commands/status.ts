@@ -57,7 +57,10 @@ export async function statusCommand(): Promise<void> {
         });
         txs = txs.concat(rows);
       }
-      qontoMissing = txs.filter((t) => t.attachmentIds.length === 0).length;
+      // Same filter as `match` — exclude self-transfers, URSSAF, qonto_fees.
+      qontoMissing = txs.filter(
+        (t) => t.attachmentIds.length === 0 && !qonto.isExcludedFromMatch(t),
+      ).length;
     } catch {
       qontoMissing = null;
     }

@@ -94,7 +94,9 @@ export async function matchCommand(options: MatchOptions): Promise<void> {
     process.exit(1);
   }
 
-  const unattached = transactions.filter((t) => t.attachmentIds.length === 0 && !isExcluded(t));
+  const unattached = transactions.filter(
+    (t) => t.attachmentIds.length === 0 && !qonto.isExcludedFromMatch(t),
+  );
   orgSpinner.succeed(
     `Qonto : ${unattached.length} transaction(s) à justifier sur ${transactions.length} debits.`,
   );
@@ -370,13 +372,4 @@ function shiftDate(iso: string, days: number): string {
   const d = new Date(iso);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-function isExcluded(t: QontoTransaction): boolean {
-  if (t.operationType === 'qonto_fee') return true;
-  const label = `${t.label} ${t.rawLabel}`.toUpperCase();
-  if (t.operationType === 'transfer' && /\b(VIR(EMENT)? INTERNE|DEBROISE)\b/.test(label))
-    return true;
-  if (/\bURSSAF\b/.test(label)) return true;
-  return false;
 }
